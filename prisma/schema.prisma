@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  // Prisma v7: url больше нельзя держать в schema.prisma
+  // Он должен быть в prisma.config.ts → datasource.url
+}
+
+model SitePage {
+  id          String   @id @default(cuid())
+  slug        String   @unique // about, service, procurement, contacts, etc
+  title       String
+  contentMd   String   // Markdown контент страницы
+  isPublished Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
+model HomeBlock {
+  id        String   @id @default(cuid())
+  key       String   @unique // hero, catalog, procurement, about, service, portfolio
+  title     String
+  subtitle  String?
+  isEnabled Boolean  @default(true)
+  sortOrder Int      @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model MenuItem {
+  id        String   @id @default(cuid())
+  label     String
+  href      String
+  sortOrder Int      @default(0)
+  isEnabled Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  sortOrder Int      @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  products  Product[]
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  title            String
+  brand            String
+  price            Int?     // null = "по запросу"
+  availability     String
+  short            String
+  descriptionMd    String
+  featuredInSearch Boolean  @default(false)
+  searchKeywords   String   @default("") // строка: "wash,заливка,7x40"
+
+  categoryId       String
+  category         Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+}
+
+model PortfolioProject {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  city        String?
+  year        Int?
+  summary     String
+  contentMd   String
+  isPublished Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
