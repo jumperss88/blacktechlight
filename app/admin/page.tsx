@@ -1,35 +1,45 @@
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import SavedToast from "@/components/SavedToast";
+
+type Props = {
+  searchParams?: Promise<{ saved?: string }>;
+};
 
 async function toggleBlock(formData: FormData) {
   "use server";
   const id = String(formData.get("id") || "");
-  if (!id) return;
+  if (!id) redirect("/admin");
 
   const b = await prisma.homeBlock.findUnique({ where: { id } });
-  if (!b) return;
+  if (!b) redirect("/admin");
 
   await prisma.homeBlock.update({
     where: { id },
     data: { isEnabled: !b.isEnabled },
   });
 
-  revalidatePath("/admin");
+  // Чтобы главная и админка обновились
   revalidatePath("/");
+  revalidatePath("/admin");
+
+  redirect("/admin?saved=1");
 }
 
 async function moveBlock(formData: FormData) {
   "use server";
   const id = String(formData.get("id") || "");
-  const dir = String(formData.get("dir") || "") as "up" | "down";
-  if (!id || (dir !== "up" && dir !== "down")) return;
+  const dir = String(formData.get("dir") || "");
+
+  if (!id || (dir !== "up" && dir !== "down")) redirect("/admin");
 
   const blocks = await prisma.homeBlock.findMany({ orderBy: { sortOrder: "asc" } });
   const idx = blocks.findIndex((x) => x.id === id);
-  if (idx === -1) return;
+  if (idx === -1) redirect("/admin");
 
   const swapWith = dir === "up" ? idx - 1 : idx + 1;
-  if (swapWith < 0 || swapWith >= blocks.length) return;
+  if (swapWith < 0 || swapWith >= blocks.length) redirect("/admin");
 
   const a = blocks[idx];
   const b = blocks[swapWith];
@@ -39,34 +49,42 @@ async function moveBlock(formData: FormData) {
     prisma.homeBlock.update({ where: { id: b.id }, data: { sortOrder: a.sortOrder } }),
   ]);
 
-  revalidatePath("/admin");
   revalidatePath("/");
+  revalidatePath("/admin");
+
+  redirect("/admin?saved=1");
 }
 
-async function updateBlock(fd: FormData) {
+async function updateBlock(formData: FormData) {
   "use server";
-  const id = String(fd.get("id") || "");
-  const title = String(fd.get("title") || "");
-  const subtitle = String(fd.get("subtitle") || "");
-  if (!id) return;
+  const id = String(formData.get("id") || "");
+  const title = String(formData.get("title") || "").trim();
+  const subtitle = String(formData.get("subtitle") || "").trim();
+
+  if (!id || !title) redirect("/admin");
 
   await prisma.homeBlock.update({
     where: { id },
     data: { title, subtitle: subtitle.length ? subtitle : null },
   });
 
-  revalidatePath("/admin");
   revalidatePath("/");
+  revalidatePath("/admin");
+
+  redirect("/admin?saved=1");
 }
 
-export default async function AdminHomeBlocksPage() {
+export default async function AdminHomeBlocksPage({ searchParams }: Props) {
+  const sp = (await searchParams) || {};
   const blocks = await prisma.homeBlock.findMany({ orderBy: { sortOrder: "asc" } });
 
   return (
     <div>
+      <SavedToast show={sp.saved === "1"} />
+
       <h1 className="text-xl font-bold">Главная — блоки</h1>
       <p className="mt-2 text-sm text-black/60">
-        Включай/выключай блоки и меняй порядок. Это управляет главной страницей.
+        Включай/выключай блоки и меняй порядок. Изменения применяются сразу после сохранения.
       </p>
 
       <div className="mt-6 grid gap-3">
