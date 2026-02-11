@@ -16,7 +16,7 @@ async function toggleBlock(id: string) {
 
   // После POST-экшена делаем redirect, чтобы страница заново отрендерилась
   // и ты сразу увидел новое состояние.
-  redirect("/admin?saved=1");
+  redirect(`/admin?saved=${Date.now()}`);
 }
 
 async function moveBlock(id: string, dir: "up" | "down") {
@@ -37,7 +37,7 @@ async function moveBlock(id: string, dir: "up" | "down") {
     prisma.homeBlock.update({ where: { id: b.id }, data: { sortOrder: a.sortOrder } }),
   ]);
 
-  redirect("/admin?saved=1");
+  redirect(`/admin?saved=${Date.now()}`);
 }
 
 async function updateBlock(formData: FormData) {
@@ -57,7 +57,7 @@ async function updateBlock(formData: FormData) {
     },
   });
 
-  redirect("/admin?saved=1");
+  redirect(`/admin?saved=${Date.now()}`);
 }
 
 // В Next 16 searchParams приходит как Promise (как и params), поэтому await.
@@ -67,13 +67,13 @@ type Props = {
 
 export default async function AdminHomeBlocksPage({ searchParams }: Props) {
   const sp = (await searchParams) ?? {};
-  const showSaved = Boolean(sp.saved);
+  const savedKey = sp.saved ? String(sp.saved) : "";
 
   const blocks = await prisma.homeBlock.findMany({ orderBy: { sortOrder: "asc" } });
 
   return (
     <div>
-      <SavedToast show={showSaved} />
+      <SavedToast showId={savedKey || undefined} />
 
       <h1 className="text-xl font-bold">Главная — блоки</h1>
       <p className="mt-2 text-sm text-black/60">

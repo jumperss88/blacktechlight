@@ -27,16 +27,21 @@ async function saveMenuItem(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/admin/menu");
 
-  redirect("/admin/menu?saved=1");
+  redirect(`/admin/menu?saved=${Date.now()}`);
 }
 
-export default async function AdminMenuPage() {
+type Props = {
+  searchParams?: Promise<{ saved?: string }>;
+};
+
+export default async function AdminMenuPage({ searchParams }: Props) {
+  const sp = (await searchParams) ?? {};
+  const savedKey = sp.saved ? String(sp.saved) : "";
   const items = await prisma.menuItem.findMany({ orderBy: { sortOrder: "asc" } });
 
   return (
     <div>
-      {/* Тост сам читает ?saved=1 из URL */}
-      <SavedToast />
+      <SavedToast showId={savedKey || undefined} />
 
       <h1 className="text-xl font-bold">Хедер — меню</h1>
       <p className="mt-2 text-sm text-black/60">

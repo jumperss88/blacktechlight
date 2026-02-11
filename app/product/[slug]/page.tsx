@@ -1,4 +1,10 @@
-import { products, formatRub } from "@/lib/products";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+function formatRub(value: number) {
+  return new Intl.NumberFormat("ru-RU").format(value) + " ₽";
+}
 
 function PageFooter() {
   return (
@@ -14,7 +20,9 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const p = products.find((x) => x.slug === slug);
+  const p = await prisma.product.findUnique({
+    where: { slug },
+  });
 
   if (!p) {
     return (
@@ -71,7 +79,7 @@ export default async function ProductPage({
 
           <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm md:col-span-2">
             <div className="text-sm font-semibold text-black">Описание</div>
-            <p className="mt-2 text-sm text-black/70">{p.description}</p>
+            <p className="mt-2 text-sm text-black/70">{p.descriptionMd}</p>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-black/10 bg-white p-4">
