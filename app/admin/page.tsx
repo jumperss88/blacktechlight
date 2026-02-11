@@ -1,16 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import SavedToast from "@/components/SavedToast";
 
-type Props = {
-  searchParams?: Promise<{ saved?: string }>;
-};
-
-async function toggleBlock(formData: FormData) {
+// --- Server Actions ---
+async function toggleBlock(id: string) {
   "use server";
-  const id = String(formData.get("id") || "");
-  if (!id) redirect("/admin");
 
   const b = await prisma.homeBlock.findUnique({ where: { id } });
   if (!b) redirect("/admin");
@@ -20,19 +14,13 @@ async function toggleBlock(formData: FormData) {
     data: { isEnabled: !b.isEnabled },
   });
 
-  // Чтобы главная и админка обновились
-  revalidatePath("/");
-  revalidatePath("/admin");
-
+  // После POST-экшена делаем redirect, чтобы страница заново отрендерилась
+  // и ты сразу увидел новое состояние.
   redirect("/admin?saved=1");
 }
 
-async function moveBlock(formData: FormData) {
+async function moveBlock(id: string, dir: "up" | "down") {
   "use server";
-  const id = String(formData.get("id") || "");
-  const dir = String(formData.get("dir") || "");
-
-  if (!id || (dir !== "up" && dir !== "down")) redirect("/admin");
 
   const blocks = await prisma.homeBlock.findMany({ orderBy: { sortOrder: "asc" } });
   const idx = blocks.findIndex((x) => x.id === id);
@@ -49,42 +37,47 @@ async function moveBlock(formData: FormData) {
     prisma.homeBlock.update({ where: { id: b.id }, data: { sortOrder: a.sortOrder } }),
   ]);
 
-  revalidatePath("/");
-  revalidatePath("/admin");
-
   redirect("/admin?saved=1");
 }
 
 async function updateBlock(formData: FormData) {
   "use server";
+
   const id = String(formData.get("id") || "");
   const title = String(formData.get("title") || "").trim();
-  const subtitle = String(formData.get("subtitle") || "").trim();
+  const subtitleRaw = String(formData.get("subtitle") || "").trim();
 
-  if (!id || !title) redirect("/admin");
+  if (!id) redirect("/admin");
 
   await prisma.homeBlock.update({
     where: { id },
-    data: { title, subtitle: subtitle.length ? subtitle : null },
+    data: {
+      title,
+      subtitle: subtitleRaw.length ? subtitleRaw : null,
+    },
   });
-
-  revalidatePath("/");
-  revalidatePath("/admin");
 
   redirect("/admin?saved=1");
 }
 
+// В Next 16 searchParams приходит как Promise (как и params), поэтому await.
+type Props = {
+  searchParams?: Promise<{ saved?: string }>;
+};
+
 export default async function AdminHomeBlocksPage({ searchParams }: Props) {
-  const sp = (await searchParams) || {};
+  const sp = (await searchParams) ?? {};
+  const showSaved = Boolean(sp.saved);
+
   const blocks = await prisma.homeBlock.findMany({ orderBy: { sortOrder: "asc" } });
 
   return (
     <div>
-      <SavedToast show={sp.saved === "1"} />
+      <SavedToast show={showSaved} />
 
       <h1 className="text-xl font-bold">Главная — блоки</h1>
       <p className="mt-2 text-sm text-black/60">
-        Включай/выключай блоки и меняй порядок. Изменения применяются сразу после сохранения.
+        Включай/выключай блоки и меняй порядок. Это управляет главной страницей.
       </p>
 
       <div className="mt-6 grid gap-3">
@@ -97,27 +90,35 @@ export default async function AdminHomeBlocksPage({ searchParams }: Props) {
               </div>
 
               <div className="flex items-center gap-2">
-                <form action={moveBlock}>
-                  <input type="hidden" name="id" value={b.id} />
-                  <input type="hidden" name="dir" value="up" />
-                  <button className="rounded-xl border border-black/15 px-3 py-2 text-sm hover:bg-black/5">
+                <form action={moveBlock.bind(null, b.id, "up")}>
+                  <button
+                    type="submit"
+                    className="rounded-xl border border-black/15 px-3 py-2 text-sm hover:bg-black/5"
+                    aria-label="Вверх"
+                    title="Вверх"
+                  >
                     ▲
                   </button>
                 </form>
 
-                <form action={moveBlock}>
-                  <input type="hidden" name="id" value={b.id} />
-                  <input type="hidden" name="dir" value="down" />
-                  <button className="rounded-xl border border-black/15 px-3 py-2 text-sm hover:bg-black/5">
+                <form action={moveBlock.bind(null, b.id, "down")}>
+                  <button
+                    type="submit"
+                    className="rounded-xl border border-black/15 px-3 py-2 text-sm hover:bg-black/5"
+                    aria-label="Вниз"
+                    title="Вниз"
+                  >
                     ▼
                   </button>
                 </form>
 
-                <form action={toggleBlock}>
-                  <input type="hidden" name="id" value={b.id} />
+                <form action={toggleBlock.bind(null, b.id)}>
                   <button
+                    type="submit"
                     className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-                      b.isEnabled ? "bg-black text-white" : "border border-black/15 hover:bg-black/5"
+                      b.isEnabled
+                        ? "bg-black text-white"
+                        : "border border-black/15 hover:bg-black/5"
                     }`}
                   >
                     {b.isEnabled ? "Включён" : "Выключен"}
@@ -134,6 +135,7 @@ export default async function AdminHomeBlocksPage({ searchParams }: Props) {
                 name="title"
                 defaultValue={b.title}
                 className="rounded-xl border border-black/20 px-4 py-2 text-sm outline-none focus:border-black"
+                required
               />
 
               <label className="text-xs text-black/60">Подзаголовок</label>
@@ -143,7 +145,10 @@ export default async function AdminHomeBlocksPage({ searchParams }: Props) {
                 className="rounded-xl border border-black/20 px-4 py-2 text-sm outline-none focus:border-black"
               />
 
-              <button className="mt-2 w-fit rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-black/90">
+              <button
+                type="submit"
+                className="mt-2 w-fit rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-black/90"
+              >
                 Сохранить
               </button>
             </form>

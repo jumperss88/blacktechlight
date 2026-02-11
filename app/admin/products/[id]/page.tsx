@@ -25,11 +25,7 @@ async function save(formData: FormData) {
 
   const priceRaw = String(formData.get("price") || "").trim();
   const price =
-    priceRaw === ""
-      ? null
-      : Number.isFinite(Number(priceRaw))
-      ? Number(priceRaw)
-      : null;
+    priceRaw === "" ? null : Number.isFinite(Number(priceRaw)) ? Number(priceRaw) : null;
 
   await prisma.product.update({
     where: { id: productId },
@@ -60,7 +56,7 @@ async function save(formData: FormData) {
     revalidatePath(`/product/${updated.slug}`);
     if (updated.category?.slug) revalidatePath(`/catalog/${updated.category.slug}`);
 
-    // ВАЖНО: уникальный saved, чтобы Next точно перерисовал страницу
+    // уникальный saved, чтобы после каждого сохранения страница гарантированно перерисовалась
     redirect(`/admin/products/${encodeURIComponent(updated.slug)}?saved=${Date.now()}`);
   }
 
@@ -70,8 +66,11 @@ async function save(formData: FormData) {
 export default async function AdminProductEdit({ params, searchParams }: Props) {
   const { id } = await params;
   const sp = (await searchParams) ?? {};
+
   const savedKey = sp.saved ? String(sp.saved) : "";
 
+  // ВАЖНО: папка [id], но сюда мы можем передавать SLUG.
+  // Поэтому сначала ищем по slug, а если не нашли — пробуем по id.
   const product =
     (await prisma.product.findUnique({
       where: { slug: id },
@@ -101,13 +100,13 @@ export default async function AdminProductEdit({ params, searchParams }: Props) 
 
   const categories = await prisma.category.findMany({ orderBy: { sortOrder: "asc" } });
 
-  // Ключ для перемонтирования формы:
-  // меняется при каждом сохранении (saved=timestamp), иначе берём updatedAt.
+  // Чтобы после сохранения поля точно обновлялись (defaultValue), перемонтируем form.
+  // savedKey меняется при каждом сохранении (saved=timestamp), иначе используем updatedAt.
   const formKey = savedKey || String(product.updatedAt.getTime());
 
   return (
     <div>
-      <SavedToast />
+      <SavedToast showId={savedKey || undefined} />
 
       <div className="flex items-end justify-between gap-4">
         <div>
@@ -130,7 +129,7 @@ export default async function AdminProductEdit({ params, searchParams }: Props) 
         </a>
       </div>
 
-      <form key={formKey} action={save} className="mt-6 grid gap-4">
+      <form key={`form-${formKey}`} action={save} className="mt-6 grid gap-4">
         <input type="hidden" name="productId" value={product.id} />
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -226,12 +225,8 @@ export default async function AdminProductEdit({ params, searchParams }: Props) 
             />
           </label>
 
-          <label className="flex items-center gap-3 text-sm mt-7">
-            <input
-              type="checkbox"
-              name="featuredInSearch"
-              defaultChecked={product.featuredInSearch}
-            />
+          <label className="mt-7 flex items-center gap-3 text-sm">
+            <input type="checkbox" name="featuredInSearch" defaultChecked={product.featuredInSearch} />
             Показывать в “быстрых подсказках” поиска
           </label>
         </div>

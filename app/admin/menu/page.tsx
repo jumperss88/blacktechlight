@@ -3,12 +3,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import SavedToast from "@/components/SavedToast";
 
-type Props = {
-  searchParams?: Promise<{ saved?: string }>;
-};
-
 async function saveMenuItem(formData: FormData) {
   "use server";
+
   const id = String(formData.get("id") || "");
   const label = String(formData.get("label") || "").trim();
   const href = String(formData.get("href") || "").trim();
@@ -17,27 +14,29 @@ async function saveMenuItem(formData: FormData) {
 
   const sortOrder = Number.isFinite(Number(sortOrderRaw)) ? Number(sortOrderRaw) : 0;
 
-  if (!id || !label || !href) redirect("/admin/menu");
+  if (!id || !label || !href) {
+    redirect("/admin/menu");
+  }
 
   await prisma.menuItem.update({
     where: { id },
     data: { label, href, sortOrder, isEnabled },
   });
 
-  // обновляем хедер на сайте + страницу админки
+  // чтобы хедер и админка подтянули новые данные
   revalidatePath("/");
   revalidatePath("/admin/menu");
 
   redirect("/admin/menu?saved=1");
 }
 
-export default async function AdminMenuPage({ searchParams }: Props) {
-  const sp = (await searchParams) || {};
+export default async function AdminMenuPage() {
   const items = await prisma.menuItem.findMany({ orderBy: { sortOrder: "asc" } });
 
   return (
     <div>
-      <SavedToast show={sp.saved === "1"} />
+      {/* Тост сам читает ?saved=1 из URL */}
+      <SavedToast />
 
       <h1 className="text-xl font-bold">Хедер — меню</h1>
       <p className="mt-2 text-sm text-black/60">
@@ -46,11 +45,7 @@ export default async function AdminMenuPage({ searchParams }: Props) {
 
       <div className="mt-6 grid gap-4">
         {items.map((m) => (
-          <form
-            key={m.id}
-            action={saveMenuItem}
-            className="rounded-2xl border border-black/10 p-4"
-          >
+          <form key={m.id} action={saveMenuItem} className="rounded-2xl border border-black/10 p-4">
             <input type="hidden" name="id" value={m.id} />
 
             <div className="grid gap-3 md:grid-cols-[140px_1fr_1fr_160px] md:items-end">

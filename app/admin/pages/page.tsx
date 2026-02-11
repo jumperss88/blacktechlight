@@ -30,6 +30,7 @@ async function togglePublishedAction(fd: FormData) {
 export default async function AdminPagesList({ searchParams }: Props) {
   const sp = (await searchParams) ?? {};
   const savedKey = sp.saved ? String(sp.saved) : "";
+  const showSaved = Boolean(savedKey);
 
   const pages = await prisma.sitePage.findMany({
     orderBy: { updatedAt: "desc" },
@@ -41,7 +42,7 @@ export default async function AdminPagesList({ searchParams }: Props) {
 
   return (
     <div key={pageKey}>
-      <SavedToast />
+      <SavedToast show={showSaved} />
 
       <h1 className="text-xl font-bold">Страницы</h1>
       <p className="mt-2 text-sm text-black/60">

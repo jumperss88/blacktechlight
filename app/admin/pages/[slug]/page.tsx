@@ -36,6 +36,7 @@ export default async function AdminPageEdit({ params, searchParams }: Props) {
   const { slug } = await params;
   const sp = (await searchParams) ?? {};
   const savedKey = sp.saved ? String(sp.saved) : "";
+  const showSaved = Boolean(savedKey);
 
   const page = await prisma.sitePage.findUnique({ where: { slug } });
 
@@ -61,7 +62,7 @@ export default async function AdminPageEdit({ params, searchParams }: Props) {
 
   return (
     <div>
-      <SavedToast />
+      <SavedToast show={showSaved} />
 
       <div className="flex items-end justify-between gap-4">
         <div>
